@@ -1,6 +1,9 @@
-#ifndef A_H
-#define A_H
-inline unsigned int bvalue(unsigned int method, unsigned long node_id) {
+//
+// Created by guser on 12/21/17.
+//
+#include "blimit.hpp"
+
+unsigned int bvalue(unsigned int method, unsigned long node_id) {
     switch (method) {
         case 0:
             return 4;
@@ -79,4 +82,3 @@ unsigned int bvalue(unsigned int method, unsigned long node_id) {
 //            return 1;
 //    }
 //}
-#endif

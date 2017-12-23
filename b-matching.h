@@ -32,9 +32,9 @@ struct Node {
 using node_list = std::unordered_map<unsigned int, Node>;
 
 unsigned int bmatch(node_list& nodes, unsigned int which_b, std::vector<unsigned int>& ids,
-                    std::unordered_map<int, min_heap>& props);
+                    std::unordered_map<int, min_heap>& props,int max_threads);
 
 void reset_heaps(std::unordered_map<int, min_heap>& props, node_list& nodes,
-                 int thread_limit, std::vector<unsigned int>& vec, unsigned int which_b);
+                 int max_threads, std::vector<unsigned int>& vec, unsigned int which_b);
 
 #endif //BMATCHING_B_MATCHING_H
