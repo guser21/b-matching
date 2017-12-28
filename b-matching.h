@@ -25,9 +25,13 @@ struct Node {
     }
     std::set<edge, std::greater<edge>>::iterator last_it;
     int id = 0;
+    std::mutex node_mut;
     std::atomic_int cur_conn{0};
     std::set<edge, std::greater<edge>> edges;
+
 };
+
+
 
 using node_list = std::unordered_map<unsigned int, Node>;
 

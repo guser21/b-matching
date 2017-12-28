@@ -22,7 +22,7 @@ struct edge {
     };
     edge(int from, double weight, int to) : from(from), weight(weight), to(to) {}
 
-    edge() = default;//TODO
+    edge() = default;
     bool operator<(const edge& other) const {
         if (from == other.from) {
             if (weight == other.weight) {
@@ -82,11 +82,11 @@ public:
         return container;
     };
 
-    edge push(edge p, bool with_mutex);
+    edge push(edge p);
 
-    edge min(bool with_mutex);
+    edge min();
 
-    bool contains(edge e, bool with_mutex);
+    bool contains(edge e);
     void reset(unsigned int n_limit );
 
     std::mutex gen_mut;

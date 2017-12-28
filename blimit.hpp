@@ -10,9 +10,9 @@ inline unsigned int bvalue(unsigned int method, unsigned long node_id) {
             return (2 * node_id + method) % 10;
     }
 }
-/**
+///**
 
-unsigned int bvalue(unsigned int method, unsigned long node_id) {
+unsigned int bvalueq(unsigned int method, unsigned long node_id) {
     switch (node_id) {
         case 2:
             return 2;
@@ -22,7 +22,7 @@ unsigned int bvalue(unsigned int method, unsigned long node_id) {
             return 2;
     }
 }
- */
+// */
 //unsigned int bvalue(unsigned int method, unsigned long node_id) {
 //
 //    switch (method) {

@@ -27,8 +27,6 @@ void read(std::string const& filename, std::unordered_map<unsigned int, Node>& n
         nodes[to].edges.emplace(to, weight, from);
 
     }
-
-
 };
 
 int main(int argc, char** argv) {
@@ -54,7 +52,6 @@ int main(int argc, char** argv) {
         proposal_list.emplace(node_id, min_heap(0));
     }
 
-    thread_limit--;
     time_t time1 = std::time(nullptr);
 
     for (unsigned int i = 0; i <= limit_b; ++i) {
