@@ -9,15 +9,14 @@
 #include <future>
 #include "b-matching.h"
 #include "blimit.hpp"
+#include "thread_pool.h"
 
 
-std::pair<edge, std::set<edge, std::greater<edge>>::iterator> best_match(Node& cur_node,
-                                                                         std::unordered_map<int, min_heap>& proposal_list) {
+edge best_match(Node& cur_node, std::unordered_map<int, min_heap>& proposal_list) {
 
-    auto stop = std::make_pair(edge::empty, cur_node.edges.end());
-    if (cur_node.edges.size() == cur_node.cur_conn) { return stop; }
-
-    for (auto it = cur_node.last_it; it != cur_node.edges.end(); it++) {
+    if (cur_node.edges.size() == cur_node.cur_conn) { return edge::empty; }
+    auto it = cur_node.last_it;
+    for (; it != cur_node.edges.end(); it++) {
         auto e = *it;
         auto& s = proposal_list.find(e.to)->second;
 
@@ -27,12 +26,12 @@ std::pair<edge, std::set<edge, std::greater<edge>>::iterator> best_match(Node& c
         s.gen_mut.unlock();
 
         if (val1 && val2) {
-            cur_node.last_it = (it);
-            return std::make_pair(e, it);
+            cur_node.last_it = it;
+            return e;
         }
     }
-
-    return stop;
+    cur_node.last_it = it;
+    return edge::empty;
 }
 
 void find_matching(unsigned int i, node_list& nodes,
@@ -40,13 +39,13 @@ void find_matching(unsigned int i, node_list& nodes,
                    unsigned int which_b,
                    std::stack<unsigned int>& reuse_nodes) {//atomic non blocking stack
     Node& cur_node = nodes.find(i)->second;
-    std::unique_lock<std::mutex> lock(cur_node.node_mut);
+    cur_node.node_mut.lock();
 
     unsigned int max_conn = bvalue(which_b, i);
     while (cur_node.cur_conn < max_conn) {//changed
 
         auto res = best_match(cur_node, proposal_list);
-        auto my_match = res.first;
+        auto my_match = res;
         if (my_match.to == edge::empty.to) break;//TODO
 
         if (bvalue(which_b, my_match.to) == 0) {
@@ -57,15 +56,17 @@ void find_matching(unsigned int i, node_list& nodes,
         {
             auto& s = proposal_list.find(my_match.to)->second;
 
-            std::unique_lock<std::mutex> mut_lock(s.gen_mut);
+            s.gen_mut.lock();
 
             auto still_mine = (!s.contains(my_match.reverse())) && (s.min() < my_match.reverse());
-            if (!still_mine || cur_node.cur_conn >= max_conn) continue;
-
-            cur_node.last_it = res.second;
+            if (!still_mine || cur_node.cur_conn >= max_conn) {
+                s.gen_mut.unlock();
+                continue;
+            }
+            auto dumped = s.push(my_match.reverse());
+            s.gen_mut.unlock();
             cur_node.cur_conn++;
 
-            auto dumped = s.push(my_match.reverse());
 
             if (dumped.to != edge::empty.to) {//TODO
                 nodes.find(dumped.to)->second.cur_conn--;
@@ -75,6 +76,7 @@ void find_matching(unsigned int i, node_list& nodes,
         }
 
     }
+    cur_node.node_mut.unlock();
 }
 
 unsigned int cal_one(std::unordered_map<int, min_heap>& props, unsigned int_id) {
@@ -100,20 +102,30 @@ void cal_everym(std::unordered_map<int, min_heap>& props,
     com_count += res;
 }
 
+
+void taskScheduler(std::vector<std::function<void()>>&& tasks) {
+    static thread_pool<void> threadpool(static_cast<int>(tasks.size() - 1));
+    std::vector<std::future<void>> futures;
+    for (int i = 1; i < tasks.size(); ++i) {
+        futures.push_back(threadpool.push(std::move(tasks[i])));
+//        futures.push_back(std::async(std::move(tasks[i])));
+    }
+    std::move(tasks[0])();
+    for (auto&& fu : futures) {
+        fu.get();
+    }
+}
+
 unsigned int cal_con(std::unordered_map<int, min_heap>& props, int max_threads, std::vector<unsigned int>& vec) {
-    auto futures = std::vector<std::future<unsigned int>>();
-    std::vector<std::thread> threads;
+    std::vector<std::function<void()>> jobs;
     std::atomic<unsigned int> com_counter{0};
 
-    for (int i = 1; i < max_threads; ++i) {
-        threads.emplace_back(
-                std::thread(cal_everym, std::ref(props), max_threads, i, std::ref(vec), std::ref(com_counter)));
+    for (int i = 0; i < max_threads; ++i) {
+        jobs.emplace_back([&, i, max_threads]() -> void {
+            cal_everym(props, max_threads, i, vec, com_counter);
+        });
     }
-    cal_everym(props, max_threads, 0, vec, com_counter);
-
-    for (auto&& th : threads) {
-        th.join();
-    }
+    taskScheduler(std::move(jobs));
     return com_counter / 2;
 }
 
@@ -141,16 +153,14 @@ void task(std::vector<unsigned int>& vec, node_list& nodes,
 unsigned int bmatch(node_list& nodes, unsigned int which_b, std::vector<unsigned int>& vec,
                     std::unordered_map<int, min_heap>& proposal_list, int max_threads) {
 
-    std::vector<std::thread> threads;
+    std::vector<std::function<void()>> jobs;
 
-    for (int i = 1; i < max_threads; ++i) {
-        threads.emplace_back(task, std::ref(vec), std::ref(nodes), std::ref(proposal_list), which_b, i, max_threads);
+    for (int i = 0; i < max_threads; ++i) {
+        jobs.emplace_back([&, which_b, i, max_threads]() -> void {
+            task(vec, nodes, proposal_list, which_b, i, max_threads);
+        });
     }
-    task(vec, nodes, proposal_list, which_b, 0, max_threads);
-
-    for (auto&& th: threads) {
-        th.join();
-    }
+    taskScheduler(std::move(jobs));
 
     unsigned int ans = cal_con(proposal_list, max_threads, vec);
     return ans;
@@ -173,15 +183,12 @@ void reset_every_m(std::unordered_map<int, min_heap>& props, node_list& nodes,
 
 void reset_heaps(std::unordered_map<int, min_heap>& props, node_list& nodes,
                  int max_threads, std::vector<unsigned int>& vec, unsigned int which_b) {
-    std::vector<std::thread> threads;
-
-    for (int i = 1; i < max_threads; ++i) {
-        threads.emplace_back(
-                std::thread(reset_every_m, std::ref(props), std::ref(nodes), max_threads, i, std::ref(vec), which_b));
+    std::vector<std::function<void()>> jobs;
+    for (int i = 0; i < max_threads; ++i) {
+        jobs.emplace_back([&, which_b, i, max_threads]() -> void {
+            reset_every_m(props, nodes, max_threads, i,vec, which_b);
+        });
     }
-    reset_every_m(props, nodes, max_threads, 0, vec, which_b);
-
-    for (auto&& th :threads) {
-        th.join();
-    }
+    taskScheduler(std::move(jobs));
 }
+
