@@ -5,12 +5,25 @@
 #ifndef BMATCHING_P_QUEUE_H
 #define BMATCHING_P_QUEUE_H
 
+#include "atomic"
+class spinlock {
+    std::atomic_flag locked = ATOMIC_FLAG_INIT ;
+public:
+    void lock() {
+        while (locked.test_and_set(std::memory_order_acquire)) { ; }
+    }
+    void unlock() {
+        locked.clear(std::memory_order_release);
+    }
+};
 
 #include <memory>
 #include <queue>
 #include <mutex>
 #include <set>
+#include <shared_mutex>
 #include "functional"
+extern std::vector<unsigned int> id_tId;
 
 struct edge {
     struct hash {
@@ -24,9 +37,11 @@ struct edge {
 
     edge() = default;
     bool operator<(const edge& other) const {
+        if(from==-1){ return true; }
         if (from == other.from) {
             if (weight == other.weight) {
-                return to < other.to;
+                return id_tId[to] < id_tId[other.to];
+
             } else {
                 return weight < other.weight;
             }
@@ -63,12 +78,10 @@ struct edge {
     int to;
 };
 
-
 class min_heap {
 public:
     min_heap(const min_heap& other) {
 
-        std::unique_lock<std::mutex> lock(gen_mut);
         container = (other.container);
         limit = other.limit;
     }
@@ -89,7 +102,9 @@ public:
     bool contains(edge e);
     void reset(unsigned int n_limit );
 
-    std::mutex gen_mut;
+//    std::mutex gen_mut;
+    std::shared_mutex gen_mut;
+//    spinlock gen_mut;
 
 private:
     std::set<edge> container;
