@@ -13,13 +13,21 @@ For the scheduling I tried 3 different tools: bare threads from std::thread, std
 I have run the tests on my laptop. The input graph was “Road network of Pennsylvania” from
 http://snap.stanford.edu/data/ ,run for 20 different b -value configurations. 
 Here you can find the processor details.
+
+
 Thread(s) per core:  2
+
 Core(s) per socket:  4
+
 Socket(s):           1
 
+
 Model name:          Intel(R) Core(TM) i7-2630QM CPU @ 2.00GHz
+
 CPU MHz:             1995.628
+
 threads- time of pure computation excluded the input processing.  
+
 1 -116s  4 - 40s        40-34s
 2 - 71s  8- 32s 
 3-  52s  16-35s   
