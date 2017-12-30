@@ -29,5 +29,7 @@ CPU MHz:             1995.628
 threads- time of pure computation excluded the input processing.  
 
 1 -116s  4 - 40s        40-34s
+
 2 - 71s  8- 32s 
+
 3-  52s  16-35s   
